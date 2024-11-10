@@ -1,0 +1,108 @@
+@isTest(SeeAllData=true)
+
+private class MaintenanceRequestHelperTest {
+    
+    @isTest
+    static void testTrigger() {
+        
+        Case oldCase = new Case();
+        
+        for (Case closedCase : [SELECT Product__c, Status, Vehicle__c FROM Case WHERE ID = '500Qy00000C0Gh0IAF']){
+            
+            
+            oldCase.Type = 'Repair';
+            oldCase.Status = 'New';
+            
+            insert oldCase;
+            oldCase.Status = 'Closed';
+        }                             
+        Test.startTest();
+        update oldCase;
+        Test.stopTest();               
+    }
+    
+    @isTest
+    static void testUpdateWorkOrders() {
+        
+        Case oldCase = new Case();
+        
+        for (Case closedCase : [SELECT Id, Product__c, Status, Vehicle__c FROM Case WHERE ID = '500Qy00000C0Gh0IAF']){
+            
+            oldCase = closedCase;
+            oldCase.Type = 'Repair';
+            oldCase.Status = 'Closed';
+        } 
+        
+        Map <Id, Case> newCasesMap = new Map <Id, Case> { oldCase.Id => oldCase };
+            Map <Id, Case> oldCasesMap = new Map <Id, Case> { oldCase.Id => oldCase };
+                
+                Test.startTest();
+        MaintenanceRequestHelper.updateWorkOrders(newCasesMap, oldCasesMap);
+        Test.stopTest();
+        
+        List<Case> newRoutineMaintenanceRequests = [SELECT Id FROM Case WHERE Subject = 'Routine Checkup'];
+        System.assertEquals(1, newRoutineMaintenanceRequests.size());
+        
+        List<Equipment_Maintenance_Item__c> newEMIList = [SELECT Id FROM Equipment_Maintenance_Item__c WHERE Maintenance_Request__c IN :newRoutineMaintenanceRequests];
+        System.assertNotEquals(0, newEMIList.size());
+    }
+    
+    
+    @isTest
+    static void testUpdateWorkOrdersBad() {
+        
+        Case oldCase = new Case();
+        
+        for (Case closedCase : [SELECT Id, Product__c, Status, Vehicle__c FROM Case WHERE ID = '500Qy00000C0Gh0IAF']){
+            
+            oldCase = closedCase;
+            oldCase.Type = 'Bad Type';
+            oldCase.Status = 'Closed';
+        }
+        
+        Map <Id, Case> newCasesMap = new Map <Id, Case> { oldCase.Id => oldCase };
+            Map <Id, Case> oldCasesMap = new Map <Id, Case> { oldCase.Id => oldCase };
+                
+                Test.startTest();
+        MaintenanceRequestHelper.updateWorkOrders(newCasesMap, oldCasesMap);
+        Test.stopTest();
+        
+        List<Case> newRoutineMaintenanceRequests = [SELECT Id FROM Case WHERE Subject = 'Routine Checkup'];
+        System.assertEquals(0, newRoutineMaintenanceRequests.size());
+        
+        List<Equipment_Maintenance_Item__c> newEMIList = [SELECT Id FROM Equipment_Maintenance_Item__c WHERE Maintenance_Request__c IN :newRoutineMaintenanceRequests];
+        System.assertEquals(0, newEMIList.size());
+    }
+    
+    @isTest
+    static void testUpdateWorkOrdersBulk() {
+        
+        Case oldCase = new Case();
+        Map <Id, Case> newCasesMap = new Map <Id, Case>();
+        Map <Id, Case> oldCasesMap = new Map <Id, Case>();
+        
+        for (Case closedCase : [SELECT Id, Subject, Product__c, Status, Vehicle__c FROM Case WHERE ID = '500Qy00000C0Gh0IAF']){
+            for(Integer i = 0; i < 299; i++){
+                
+                oldCase = closedCase;
+                oldCase.Type = 'Repair';
+                oldCase.Status = 'Closed';
+                oldCase.Subject = 'Test Case Bulk'+i;
+                
+                newCasesMap.put(oldCase.Id, oldCase);
+                oldCasesMap.put(oldCase.Id, oldCase);
+                
+            }
+        } 
+        
+        Test.startTest();
+        MaintenanceRequestHelper.updateWorkOrders(newCasesMap, oldCasesMap);
+        Test.stopTest();
+        
+        List<Case> newRoutineMaintenanceRequests = [SELECT Id FROM Case WHERE Subject = 'Routine Checkup'];
+        System.assertEquals(1, newRoutineMaintenanceRequests.size());
+        
+        List<Equipment_Maintenance_Item__c> newEMIList = [SELECT Id FROM Equipment_Maintenance_Item__c WHERE Maintenance_Request__c IN :newRoutineMaintenanceRequests];
+        System.assertNotEquals(0, newEMIList.size());
+    }
+}

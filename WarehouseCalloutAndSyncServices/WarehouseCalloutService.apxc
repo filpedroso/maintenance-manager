@@ -1,0 +1,45 @@
+public with sharing class WarehouseCalloutService implements Queueable, Database.AllowsCallouts {
+    
+    // calls wharehouse in a schedulable basis to get updated equipments from their database
+    public static void execute(QueueableContext context) {
+        
+        Http http = new Http();
+        HttpRequest request = new HttpRequest();
+        request.setEndpoint('https://th-superbadge-apex.herokuapp.com/equipment');
+        request.setMethod('GET');
+        
+        HttpResponse response = http.send(request);
+        System.debug(response);
+                        
+        List<Object> results = (List<Object>) JSON.deserializeUntyped(response.getBody());
+        System.debug(results);    
+        processResult(results);                
+    }
+    
+    // upserts newly created Product2 objs from GET callout to database
+    public static void processResult(List<Object> results) {
+        
+        List<Product2> upsertProducts = new List<Product2>();
+        
+        for (Object obj : results) {
+            Map<String, Object> objMap = (Map<String, Object>) obj;
+            Product2 equipment = createProductFromMap(objMap);
+            upsertProducts.add(equipment);            
+        }                       
+        upsert upsertProducts;
+    }        
+    
+    // processes deserialized data from GET request and transforms into Product2 objects
+    private static Product2 createProductFromMap(Map<String, Object> objMap) {
+        Product2 equipment = new Product2();
+        equipment.ProductCode = (String) objMap.get('_id');
+        equipment.Replacement_Part__c = true;
+        equipment.Current_Inventory__c = (Integer) objMap.get('quantity');
+        equipment.Name = (String) objMap.get('name');
+        equipment.Maintenance_Cycle__c = (Integer) objMap.get('maintenanceperiod');
+        equipment.Lifespan_Months__c = (Integer) objMap.get('lifespan');
+        equipment.Cost__c = (Decimal) objMap.get('cost');
+        equipment.Warehouse_SKU__c = (String) objMap.get('sku');
+        return equipment;
+    }   
+}

@@ -1,0 +1,21 @@
+@isTest
+public with sharing class WarehouseSyncScheduleTest {
+    
+    public static String CRON_EXP = '0 0 1 15 3 ? 2042';
+    
+    @IsTest
+    static void testScheduledJob() {
+        
+        Test.startTest();
+        Test.setMock(HttpCalloutMock.class, new WarehouseCalloutServiceMock());
+        String jobId = System.schedule('ScheduledApexTest', CRON_EXP, new WarehouseSyncSchedule());
+        
+        List<Task> lt = [SELECT Id
+                         FROM Task
+                         WHERE WhatId = : jobId];
+        
+        System.assertEquals(0, lt.size(), 'Tasks exist before job has run');
+        
+        Test.stopTest();                               
+    }
+}

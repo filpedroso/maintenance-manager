@@ -1,0 +1,86 @@
+public class MaintenanceRequestHelper {
+    
+    public static void updateWorkOrders(Map<Id, Case> newCasesMap, Map<Id, Case> oldCasesMap) {
+        
+        List<Case> newRoutineMaintenanceRequests = new List<Case>();
+        List <Equipment_Maintenance_Item__c> newEMIList = new List <Equipment_Maintenance_Item__c>();
+        Case oldCase;
+        Case newRoutineMaintenance = new Case();
+        Equipment_Maintenance_Item__c newEMI;
+        Map <Case, List<Equipment_Maintenance_Item__c>> mapLinkToThePast = new Map <Case, List<Equipment_Maintenance_Item__c>>();
+
+        List <Equipment_Maintenance_Item__c> emiList2 = new List <Equipment_Maintenance_Item__c>();
+        emiList2 = [SELECT Equipment__c, Quantity__c, Maintenance_Request__c
+                    FROM Equipment_Maintenance_Item__c
+                    WHERE Maintenance_Request__c IN :newCasesMap.keySet()];
+                    
+        List <Equipment_Maintenance_Item__c> emiList = emiList2;
+        Set <Id> caseIdSet = new Set <Id>(oldCasesMap.keySet());        
+        Map <Id, Integer> mapFromMethod = findShortestCycleDays(caseIdSet);
+        
+        for (Case closedCase : newCasesMap.values()) {
+            
+            oldCase = oldCasesMap.get(closedCase.Id);
+            
+            if (closedCase.Status == 'Closed' && (oldCase.Type == 'Repair' || oldCase.Type == 'Routine Maintenance')) {
+                
+                Integer shortestCycleDays; //findShortestCycleDays(closedCase.Id);
+                shortestCycleDays = mapFromMethod.get(oldCase.Id);
+                Date dueDate = Date.today().addDays(shortestCycleDays);
+                
+                newRoutineMaintenance = new Case(
+                    Type = 'Routine Maintenance',
+                    Subject = 'Routine Checkup',
+                    Vehicle__c = oldCase.Vehicle__c,                    							
+                    Date_Reported__c = Date.today(),
+                    Date_Due__c = dueDate);
+                
+                newRoutineMaintenanceRequests.add(newRoutineMaintenance);
+                
+                mapLinkToThePast.put(newRoutineMaintenance, new List<Equipment_Maintenance_Item__c>());
+                
+                for (Equipment_Maintenance_Item__c emi : emiList) {                    
+                    if (emi.Maintenance_Request__c == oldCase.Id){
+                        
+                        mapLinkToThePast.get(newRoutineMaintenance).add(emi);
+                    }
+                }                                                                                                                                                                                                }
+        }
+        insert newRoutineMaintenanceRequests;
+        
+        for (Case idNew : mapLinkToThePast.keySet() ){
+            for (List<Equipment_Maintenance_Item__c> emiListOld : mapLinkToThePast.values() ){
+                for (Equipment_Maintenance_Item__c emiOld : emiListOld) {
+                    
+                    newEMI = new Equipment_Maintenance_Item__c(Equipment__c = emiOld.Equipment__c,
+                                                               Quantity__c = emiOld.Quantity__c,
+                                                               Maintenance_Request__c = idNew.Id);
+                    newEMIList.add(newEMI);                    
+                }
+            }
+        }                        
+        if (!newEMIList.isEmpty()) {
+            insert newEMIList;
+        }        
+    }        
+    public static Map<Id, Integer> findShortestCycleDays(Set<Id> caseIds) {
+        
+        Map<Id, Integer> caseIdToSmallCycle = new Map<Id, Integer>();        
+        
+        List<Equipment_Maintenance_Item__c> emiList = [SELECT Equipment__c, Maintenance_Request__c, Equipment__r.Maintenance_Cycle__c 
+                                                       FROM Equipment_Maintenance_Item__c
+                                                       WHERE Maintenance_Request__c IN :caseIds];
+        
+        Map<Id, Integer> caseIdToSmallestCycle = new Map<Id, Integer>();
+        
+        for (Equipment_Maintenance_Item__c emi : emiList) {
+            Id caseId = emi.Maintenance_Request__c;
+            Integer cycleValue = emi.Equipment__r.Maintenance_Cycle__c.intValue();
+            
+            if (!caseIdToSmallestCycle.containsKey(caseId) || cycleValue < caseIdToSmallestCycle.get(caseId)) {
+                caseIdToSmallestCycle.put(caseId, cycleValue);
+            }
+        }                       
+        return caseIdToSmallestCycle;
+    }    
+}

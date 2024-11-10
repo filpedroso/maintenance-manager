@@ -1,0 +1,24 @@
+@IsTest(SeeAllData=true)
+private class WarehouseCalloutServiceTest {
+    // implement your mock callout test here
+    
+    @isTest
+    static void testCallout() {
+                
+        //HttpResponse result = WarehouseCalloutService.makeGetCallout();     
+         
+        
+        Test.startTest();
+        Test.setMock(HttpCalloutMock.class, new WarehouseCalloutServiceMock());               
+        System.enqueueJob(new WarehouseCalloutService());
+            
+        Test.stopTest();
+        
+        
+        List<Product2> products = [SELECT Id, Name, Current_Inventory__c FROM Product2 WHERE Warehouse_SKU__c = :'100003'];
+        
+        Product2 product = products[0];
+        System.assertEquals('Generator 1000 kW', product.Name);
+        System.assertEquals(5, product.Current_Inventory__c);
+    }
+}
