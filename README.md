@@ -1,4 +1,4 @@
-# Maintenance & Warehouse Management in Apex
+# Maintenance & Warehouse Management
 
 This repository contains code developed for Trailhead’s **Apex Specialist** superbadge, focused on automating maintenance and warehouse operations in Salesforce.
 
